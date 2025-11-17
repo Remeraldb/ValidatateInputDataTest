@@ -329,12 +329,3 @@ function validateSingleField(fieldId) {
     
     return true;
 }
-
-// Utility function to clear specific error
-function clearError(errorElementId, inputId) {
-    const errorElement = document.getElementById(errorElementId);
-    const inputElement = document.getElementById(inputId);
-    
-    if (errorElement) errorElement.textContent = '';
-    if (inputElement) inputElement.classList.remove('error-field', 'field-error');
-}
