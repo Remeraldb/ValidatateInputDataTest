@@ -7,6 +7,41 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Error Popup -->
+    <div id="errorPopup" class="popup">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3>Помилка валідації</h3>
+                <span class="close-btn" id="closePopup">&times;</span>
+            </div>
+            <div class="popup-body">
+                <div class="error-icon">⚠️</div>
+                <p id="popupMessage"></p>
+            </div>
+            <div class="popup-footer">
+                <button id="confirmError" class="btn-primary">Зрозуміло</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Popup -->
+    <div id="successPopup" class="popup">
+        <div class="popup-content success-popup">
+            <div class="popup-header">
+                <h3>Успішно!</h3>
+                <span class="close-btn" id="closeSuccessPopup">&times;</span>
+            </div>
+            <div class="popup-body">
+                <div class="success-icon">✅</div>
+                <p id="successMessage"></p>
+            </div>
+            <div class="popup-footer">
+                <button id="confirmSuccess" class="btn-success">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Form -->
     <div class="container">
         <h1>Форма реєстрації користувача</h1>
         
@@ -55,8 +90,6 @@
 
             <button type="submit">Зареєструватися</button>
         </form>
-
-        <div id="serverResponse"></div>
     </div>
 
     <script src="script.js"></script>
