@@ -27,5 +27,4 @@ dist/
 build/
 
 # My report
-Лаб3.odt
-.~lock.Лаб3.odt#
+/reportDocs
