@@ -19,7 +19,10 @@ class Validator {
     }
     
     static validatePhone(phone) {
-        return /^\d+$/.test(phone);
+        // Remove spaces and validate Ukrainian phone format
+        const cleanPhone = phone.replace(/\s+/g, '');
+        const phoneRegex = /^(\+?38)?(0\d{9})$/;
+        return phoneRegex.test(cleanPhone);
     }
     
     static validateBirthdate(birthdate) {
@@ -50,7 +53,7 @@ class Validator {
         }
         
         if (!this.validatePhone(data.phone)) {
-            errors.push('Номер телефону повинен містити тільки цифри');
+            errors.push('Номер телефону повинен бути у форматі: +380XXXXXXXXX або 0XXXXXXXXX');
         }
         
         if (!this.validateBirthdate(data.birthdate)) {

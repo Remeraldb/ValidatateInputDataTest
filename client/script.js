@@ -141,12 +141,15 @@ function validateForm() {
         isValid = false;
     }
     
-    // Phone validation
+    // Phone validation - IMPROVED
     const phone = document.getElementById('phone').value;
-    if (!/^\d+$/.test(phone)) {
-        errors.push('Номер телефону повинен містити тільки цифри');
-        fieldErrors.phone = 'Номер телефону повинен містити тільки цифри';
-        showError('phoneError', 'Номер телефону повинен містити тільки цифри');
+    const phoneRegex = /^(\+?38)?(0\d{9})$/; // Ukrainian phone format: +380XXXXXXXXX or 0XXXXXXXXX
+    const cleanPhone = phone.replace(/\s+/g, ''); // Remove spaces
+    
+    if (!phoneRegex.test(cleanPhone)) {
+        errors.push('Номер телефону повинен бути у форматі: +380XXXXXXXXX або 0XXXXXXXXX');
+        fieldErrors.phone = 'Номер телефону повинен бути у форматі: +380XXXXXXXXX або 0XXXXXXXXX';
+        showError('phoneError', 'Номер телефону повинен бути у форматі: +380XXXXXXXXX або 0XXXXXXXXX');
         isValid = false;
     }
     
@@ -266,6 +269,20 @@ document.querySelectorAll('input').forEach(input => {
     });
 });
 
+// Phone input formatting
+document.getElementById('phone').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    // Format as Ukrainian phone number
+    if (value.startsWith('38') && value.length > 2) {
+        value = '+' + value.substring(0, 3) + ' ' + value.substring(3, 6) + ' ' + value.substring(6, 9) + ' ' + value.substring(9, 12);
+    } else if (value.startsWith('0') && value.length > 1) {
+        value = value.substring(0, 3) + ' ' + value.substring(3, 6) + ' ' + value.substring(6, 9) + ' ' + value.substring(9, 12);
+    }
+    
+    e.target.value = value;
+});
+
 function validateSingleField(fieldId) {
     const value = document.getElementById(fieldId).value;
     const errorElement = document.getElementById(fieldId + 'Error');
@@ -309,9 +326,14 @@ function validateSingleField(fieldId) {
             break;
             
         case 'phone':
-            if (value.length > 0 && !/^\d+$/.test(value)) {
-                showError('phoneError', 'Номер телефону повинен містити тільки цифри');
-                return false;
+            if (value.length > 0) {
+                const cleanPhone = value.replace(/\s+/g, '');
+                const phoneRegex = /^(\+?38)?(0\d{9})$/;
+                
+                if (!phoneRegex.test(cleanPhone)) {
+                    showError('phoneError', 'Формат: +380XXXXXXXXX або 0XXXXXXXXX');
+                    return false;
+                }
             }
             break;
             
