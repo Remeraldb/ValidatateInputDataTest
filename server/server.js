@@ -51,8 +51,8 @@ const authenticateToken = (req, res, next) => {
     }
 };
 
-// Routes
-app.post('/register', async (req, res) => {
+// API Routes - FIXED: Use /api prefix to avoid conflicts
+app.post('/api/register', async (req, res) => {
     try {
         const { login, name, email, password, phone, birthdate } = req.body;
 
@@ -90,7 +90,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -126,7 +126,8 @@ app.post('/login', async (req, res) => {
     }
 });
 
-app.get('/profile', authenticateToken, (req, res) => {
+// FIXED: Changed to /api/profile to avoid conflict with static file serving
+app.get('/api/profile', authenticateToken, (req, res) => {
     try {
         const user = AuthService.getUserById(req.user.userId);
         
@@ -150,14 +151,15 @@ app.get('/profile', authenticateToken, (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Profile error:', error);
         res.status(500).json({
             success: false,
-            message: 'Помилка сервера'
+            message: 'Помилка сервера при завантаженні профілю'
         });
     }
 });
 
-app.post('/verify-token', authenticateToken, (req, res) => {
+app.post('/api/verify-token', authenticateToken, (req, res) => {
     res.json({
         success: true,
         message: 'Токен дійсний',
@@ -165,7 +167,17 @@ app.post('/verify-token', authenticateToken, (req, res) => {
     });
 });
 
+// Catch-all handler for client-side routing
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
+    console.log('API endpoints:');
+    console.log('  POST /api/register');
+    console.log('  POST /api/login'); 
+    console.log('  GET  /api/profile');
+    console.log('  POST /api/verify-token');
 });

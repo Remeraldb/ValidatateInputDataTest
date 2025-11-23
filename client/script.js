@@ -172,17 +172,65 @@ if (document.getElementById('loginForm')) {
 
 // Profile page functionality
 if (document.getElementById('userProfile')) {
-    // Load user profile
-    loadUserProfile();
+    // Load user profile when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUserProfile();
+    });
 
     // Verify token button
     if (document.getElementById('verifyToken')) {
         document.getElementById('verifyToken').addEventListener('click', verifyToken);
     }
 
+    // Refresh page button - FIXED
+    if (document.getElementById('refreshPage')) {
+        document.getElementById('refreshPage').addEventListener('click', function() {
+            location.reload();
+        });
+    }
+
     // Logout button
     if (document.getElementById('logout')) {
         document.getElementById('logout').addEventListener('click', logout);
+    }
+
+    // Update token timer every second
+    setInterval(updateTokenTimer, 1000);
+}
+
+// Update token timer display
+function updateTokenTimer() {
+    const tokenTimer = document.getElementById('tokenTimer');
+    const tokenTimeLeft = document.getElementById('tokenTimeLeft');
+    
+    if (tokenTimer && tokenTimeLeft && TokenManager.isLoggedIn()) {
+        const timeLeft = TokenManager.getTimeUntilExpiry();
+        const secondsLeft = Math.floor(timeLeft / 1000);
+        
+        if (secondsLeft > 0) {
+            tokenTimer.style.display = 'block';
+            tokenTimeLeft.textContent = secondsLeft;
+            
+            // Change color when less than 30 seconds
+            if (secondsLeft < 30) {
+                tokenTimer.style.background = '#f8d7da';
+                tokenTimer.style.borderColor = '#f5c6cb';
+                tokenTimer.style.color = '#721c24';
+            } else {
+                tokenTimer.style.background = '#fff3cd';
+                tokenTimer.style.borderColor = '#ffeaa7';
+                tokenTimer.style.color = '#856404';
+            }
+        } else {
+            tokenTimer.style.display = 'none';
+            TokenManager.removeToken();
+            // Reload to show login prompt
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    } else {
+        if (tokenTimer) tokenTimer.style.display = 'none';
     }
 }
 
@@ -269,6 +317,8 @@ function validateForm() {
     };
 }
 
+// ... (keep all the existing code above, only change the fetch URLs)
+
 async function submitRegistration() {
     const formData = {
         login: document.getElementById('login').value,
@@ -284,7 +334,8 @@ async function submitRegistration() {
         submitBtn.textContent = 'Обробка...';
         submitBtn.disabled = true;
 
-        const response = await fetch('http://localhost:3000/register', {
+        // FIXED: Changed to /api/register
+        const response = await fetch('http://localhost:3000/api/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -314,7 +365,6 @@ async function submitRegistration() {
     }
 }
 
-// Login functions
 async function submitLogin() {
     const formData = {
         email: document.getElementById('email').value,
@@ -326,7 +376,8 @@ async function submitLogin() {
         submitBtn.textContent = 'Вхід...';
         submitBtn.disabled = true;
 
-        const response = await fetch('http://localhost:3000/login', {
+        // FIXED: Changed to /api/login
+        const response = await fetch('http://localhost:3000/api/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -356,7 +407,7 @@ async function submitLogin() {
     }
 }
 
-// Profile functions
+// Profile functions - FIXED
 async function loadUserProfile() {
     const token = TokenManager.getToken();
     
@@ -370,7 +421,10 @@ async function loadUserProfile() {
     }
 
     try {
-        const response = await fetch('http://localhost:3000/profile', {
+        console.log('Loading profile with token:', token.substring(0, 20) + '...');
+        
+        // FIXED: Changed to /api/profile
+        const response = await fetch('http://localhost:3000/api/profile', {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -378,7 +432,14 @@ async function loadUserProfile() {
             }
         });
 
+        console.log('Profile response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const result = await response.json();
+        console.log('Profile result:', result);
         
         if (result.success) {
             document.getElementById('userProfile').innerHTML = `
@@ -406,28 +467,30 @@ async function loadUserProfile() {
                     </div>
                     <div class="profile-field">
                         <label>Дата народження:</label>
-                        <span>${result.user.birthdate ? new Date(result.user.birthdate).toLocaleDateString() : 'Не вказано'}</span>
+                        <span>${result.user.birthdate ? new Date(result.user.birthdate).toLocaleDateString('uk-UA') : 'Не вказано'}</span>
                     </div>
                     <div class="profile-field">
                         <label>Дата реєстрації:</label>
-                        <span>${new Date(result.user.createdAt).toLocaleString()}</span>
+                        <span>${new Date(result.user.createdAt).toLocaleString('uk-UA')}</span>
                     </div>
                 </div>
             `;
         } else {
-            popupManager.showError(result.message);
-            TokenManager.removeToken();
-            // Reload to show login prompt
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
+            throw new Error(result.message || 'Помилка завантаження профілю');
         }
     } catch (error) {
+        console.error('Profile loading error:', error);
         document.getElementById('userProfile').innerHTML = `
             <div class="error-message">
-                <p>Помилка завантаження профілю. Спробуйте оновити сторінку.</p>
+                <p>Помилка завантаження профілю: ${error.message}</p>
+                <p>Спробуйте оновити сторінку або увійти знову.</p>
             </div>
         `;
+        
+        // If it's an authentication error, remove token
+        if (error.message.includes('401') || error.message.includes('403')) {
+            TokenManager.removeToken();
+        }
     }
 }
 
@@ -440,13 +503,18 @@ async function verifyToken() {
     }
 
     try {
-        const response = await fetch('http://localhost:3000/verify-token', {
+        // FIXED: Changed to /api/verify-token
+        const response = await fetch('http://localhost:3000/api/verify-token', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             }
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
         const result = await response.json();
         
@@ -458,16 +526,16 @@ async function verifyToken() {
             document.getElementById('tokenData').innerHTML = `
                 <p><strong>Статус:</strong> <span style="color: green;">Дійсний</span></p>
                 <p><strong>User ID:</strong> ${result.user.userId}</p>
-                <p><strong>Видано:</strong> ${new Date(tokenData.iat * 1000).toLocaleString()}</p>
-                <p><strong>Дійсний до:</strong> ${new Date(tokenData.exp * 1000).toLocaleString()}</p>
+                <p><strong>Видано:</strong> ${new Date(tokenData.iat * 1000).toLocaleString('uk-UA')}</p>
+                <p><strong>Дійсний до:</strong> ${new Date(tokenData.exp * 1000).toLocaleString('uk-UA')}</p>
                 <p><strong>Залишилось:</strong> ${Math.floor(timeLeft / 1000)} секунд</p>
             `;
         } else {
-            popupManager.showError(result.message);
-            TokenManager.removeToken();
+            throw new Error(result.message);
         }
     } catch (error) {
-        popupManager.showError('Помилка перевірки токена');
+        popupManager.showError('Помилка перевірки токена: ' + error.message);
+        TokenManager.removeToken();
     }
 }
 
@@ -523,13 +591,3 @@ if (document.getElementById('phone')) {
         e.target.value = value;
     });
 }
-
-// Auto-check token expiry every 30 seconds
-setInterval(() => {
-    if (TokenManager.isLoggedIn()) {
-        const timeLeft = TokenManager.getTimeUntilExpiry();
-        if (timeLeft < 30000) { // 30 seconds left
-            console.log('Token expiring soon:', Math.floor(timeLeft / 1000) + 's left');
-        }
-    }
-}, 30000);
