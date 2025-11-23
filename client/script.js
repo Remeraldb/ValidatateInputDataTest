@@ -89,6 +89,8 @@ class TokenManager {
 
     static removeToken() {
         localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userEmail');
     }
 
     static isLoggedIn() {
@@ -124,6 +126,14 @@ class TokenManager {
         const expiry = this.getTokenExpiry();
         if (!expiry) return 0;
         return Math.max(0, expiry - Date.now());
+    }
+
+    static isAdmin() {
+        const token = this.getToken();
+        if (!token) return false;
+        
+        const tokenData = this.decodeToken(token);
+        return tokenData && tokenData.role === 'admin';
     }
 }
 
@@ -182,7 +192,7 @@ if (document.getElementById('userProfile')) {
         document.getElementById('verifyToken').addEventListener('click', verifyToken);
     }
 
-    // Refresh page button - FIXED
+    // Refresh page button
     if (document.getElementById('refreshPage')) {
         document.getElementById('refreshPage').addEventListener('click', function() {
             location.reload();
@@ -317,8 +327,6 @@ function validateForm() {
     };
 }
 
-// ... (keep all the existing code above, only change the fetch URLs)
-
 async function submitRegistration() {
     const formData = {
         login: document.getElementById('login').value,
@@ -334,7 +342,6 @@ async function submitRegistration() {
         submitBtn.textContent = 'Обробка...';
         submitBtn.disabled = true;
 
-        // FIXED: Changed to /api/register
         const response = await fetch('http://localhost:3000/api/register', {
             method: 'POST',
             headers: {
@@ -365,6 +372,7 @@ async function submitRegistration() {
     }
 }
 
+// Login functions
 async function submitLogin() {
     const formData = {
         email: document.getElementById('email').value,
@@ -376,7 +384,6 @@ async function submitLogin() {
         submitBtn.textContent = 'Вхід...';
         submitBtn.disabled = true;
 
-        // FIXED: Changed to /api/login
         const response = await fetch('http://localhost:3000/api/login', {
             method: 'POST',
             headers: {
@@ -389,11 +396,21 @@ async function submitLogin() {
         
         if (result.success) {
             TokenManager.setToken(result.token);
+            // Store user info for admin checks
+            if (result.user.role) {
+                localStorage.setItem('userRole', result.user.role);
+            }
+            localStorage.setItem('userEmail', result.user.email);
+            
             popupManager.showSuccess('Успішний вхід! Перенаправлення...');
             
-            // Redirect to profile after 2 seconds
+            // Redirect to appropriate page based on role
             setTimeout(() => {
-                window.location.href = 'profile.html';
+                if (result.user.role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'profile.html';
+                }
             }, 2000);
         } else {
             popupManager.showError(result.message);
@@ -407,7 +424,7 @@ async function submitLogin() {
     }
 }
 
-// Profile functions - FIXED
+// Profile functions
 async function loadUserProfile() {
     const token = TokenManager.getToken();
     
@@ -423,7 +440,6 @@ async function loadUserProfile() {
     try {
         console.log('Loading profile with token:', token.substring(0, 20) + '...');
         
-        // FIXED: Changed to /api/profile
         const response = await fetch('http://localhost:3000/api/profile', {
             method: 'GET',
             headers: {
@@ -473,8 +489,23 @@ async function loadUserProfile() {
                         <label>Дата реєстрації:</label>
                         <span>${new Date(result.user.createdAt).toLocaleString('uk-UA')}</span>
                     </div>
+                    <div class="profile-field">
+                        <label>Роль:</label>
+                        <span>${result.user.role === 'admin' ? '👑 Адміністратор' : '👤 Користувач'}</span>
+                    </div>
                 </div>
             `;
+            
+            // Show admin link if user is admin
+            if (result.user.role === 'admin') {
+                const navigationSection = document.querySelector('.navigation-section');
+                if (navigationSection) {
+                    const adminLink = document.createElement('div');
+                    adminLink.className = 'admin-link';
+                    adminLink.innerHTML = `<a href="admin.html" style="color: #dc3545; font-weight: bold;">👑 Адмін панель</a>`;
+                    navigationSection.prepend(adminLink);
+                }
+            }
         } else {
             throw new Error(result.message || 'Помилка завантаження профілю');
         }
@@ -503,7 +534,6 @@ async function verifyToken() {
     }
 
     try {
-        // FIXED: Changed to /api/verify-token
         const response = await fetch('http://localhost:3000/api/verify-token', {
             method: 'POST',
             headers: {

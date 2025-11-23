@@ -9,6 +9,27 @@
       "phone": "+380 999 888 777",
       "birthdate": "2025-11-01",
       "createdAt": "2025-11-23T14:21:22.782Z"
+    },
+    {
+      "id": "1763914885688",
+      "login": "Silverhand",
+      "name": "Keanu Reeves",
+      "email": "keanureeves@hotmail.com",
+      "password": "$2a$10$W99lax8A1LV6cZjVkyBVQut2uwbBck8qIs8Die2ELipG8nXRVUwgG",
+      "phone": "+380 111 222 333",
+      "birthdate": "1861-06-09",
+      "createdAt": "2025-11-23T16:21:25.688Z"
+    },
+    {
+      "id": "admin-001",
+      "login": "admin",
+      "name": "System Administrator",
+      "email": "admin@system.com",
+      "password": "$2a$10$M9SvvGSqaUgfQ62BM4AO1uRuKZ//Sx1Cud3Ia2Yts.APG8H5TyNLK",
+      "phone": "+380000000000",
+      "birthdate": "2000-01-01",
+      "role": "admin",
+      "createdAt": "2025-11-23T16:56:32.144Z"
     }
   ]
 }

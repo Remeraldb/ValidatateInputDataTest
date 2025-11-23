@@ -8,8 +8,18 @@ const AuthService = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(helmet());
+// Fixed CSP configuration
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+        },
+    },
+}));
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
@@ -27,12 +37,27 @@ app.get('/profile', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/profile.html'));
 });
 
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/admin.html'));
+});
+
+// Функція для отримання інформації про клієнта
+const getClientInfo = (req) => {
+    return {
+        ip: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown',
+        endpoint: req.originalUrl
+    };
+};
+
 // Auth middleware
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const clientInfo = getClientInfo(req);
 
     if (!token) {
+        AuthService.logFailedTokenAttempt(null, 'Токен не надано', clientInfo);
         return res.status(401).json({
             success: false,
             message: 'Токен доступу не надано'
@@ -40,8 +65,11 @@ const authenticateToken = (req, res, next) => {
     }
 
     try {
-        const decoded = AuthService.verifyToken(token);
+        const decoded = AuthService.verifyToken(token, clientInfo);
         req.user = decoded;
+        
+        // Логуємо успішну валідацію
+        AuthService.logSuccessfulTokenValidation(token, clientInfo);
         next();
     } catch (error) {
         return res.status(403).json({
@@ -51,7 +79,23 @@ const authenticateToken = (req, res, next) => {
     }
 };
 
-// API Routes - FIXED: Use /api prefix to avoid conflicts
+// Admin middleware
+const requireAdmin = (req, res, next) => {
+    const user = AuthService.getUserById(req.user.userId);
+    
+    if (!user || !AuthService.isAdmin(user)) {
+        AuthService.logFailedTokenAttempt(req.headers['authorization']?.split(' ')[1], 
+            'Non-admin attempt to access admin panel', getClientInfo(req));
+        return res.status(403).json({
+            success: false,
+            message: 'Доступ заборонено. Потрібні права адміністратора.'
+        });
+    }
+    
+    next();
+};
+
+// API Routes
 app.post('/api/register', async (req, res) => {
     try {
         const { login, name, email, password, phone, birthdate } = req.body;
@@ -105,7 +149,7 @@ app.post('/api/login', async (req, res) => {
         const user = await AuthService.authenticateUser(email, password);
         
         // Generate token
-        const token = AuthService.generateToken(user.id);
+        const token = AuthService.generateToken(user.id, user.role);
 
         res.json({
             success: true,
@@ -115,7 +159,8 @@ app.post('/api/login', async (req, res) => {
                 id: user.id,
                 login: user.login,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                role: user.role || 'user'
             }
         });
     } catch (error) {
@@ -126,7 +171,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// FIXED: Changed to /api/profile to avoid conflict with static file serving
 app.get('/api/profile', authenticateToken, (req, res) => {
     try {
         const user = AuthService.getUserById(req.user.userId);
@@ -147,7 +191,8 @@ app.get('/api/profile', authenticateToken, (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 birthdate: user.birthdate,
-                createdAt: user.createdAt
+                createdAt: user.createdAt,
+                role: user.role || 'user'
             }
         });
     } catch (error) {
@@ -167,17 +212,41 @@ app.post('/api/verify-token', authenticateToken, (req, res) => {
     });
 });
 
+// Новий endpoint для перегляду логів (тільки для адміністратора)
+app.get('/api/admin/logs', authenticateToken, requireAdmin, (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const logs = AuthService.getAuthLogs(limit);
+        
+        res.json({
+            success: true,
+            logs: logs,
+            total: logs.length
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Помилка отримання логів'
+        });
+    }
+});
+
 // Catch-all handler for client-side routing
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-    console.log('API endpoints:');
+app.listen(PORT, async () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log('📊 API endpoints:');
     console.log('  POST /api/register');
     console.log('  POST /api/login'); 
     console.log('  GET  /api/profile');
     console.log('  POST /api/verify-token');
+    console.log('  GET  /api/admin/logs');
+    console.log('📝 Logging enabled: auth.log');
+    console.log('🔐 Admin credentials:');
+    console.log('  Email: admin@system.com');
+    console.log('  Password: admin123');
 });
