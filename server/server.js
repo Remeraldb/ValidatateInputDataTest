@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const Validator = require('./validation');
+const AuthService = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,13 +14,45 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Serve the main page
+// Serve pages
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
-// Registration endpoint
-app.post('/register', (req, res) => {
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/login.html'));
+});
+
+app.get('/profile', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/profile.html'));
+});
+
+// Auth middleware
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Токен доступу не надано'
+        });
+    }
+
+    try {
+        const decoded = AuthService.verifyToken(token);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(403).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Routes
+app.post('/register', async (req, res) => {
     try {
         const { login, name, email, password, phone, birthdate } = req.body;
 
@@ -32,38 +65,104 @@ app.post('/register', (req, res) => {
             birthdate: birthdate || ''
         };
 
-        // Server-side validation
+        // Validation
         const errors = Validator.validateAll(data);
-
-        if (errors.length === 0) {
-            // Here you would typically save to database
-            // For this example, we'll just return success
-            
-            res.json({
-                success: true,
-                message: 'Реєстрація успішна! Дані пройшли валідацію.',
-                data: {
-                    login: data.login,
-                    name: data.name,
-                    email: data.email,
-                    phone: data.phone,
-                    birthdate: data.birthdate
-                }
-            });
-        } else {
-            res.status(400).json({
+        if (errors.length > 0) {
+            return res.status(400).json({
                 success: false,
-                message: 'Знайдено помилки у формі:',
+                message: 'Помилки валідації',
                 errors: errors
             });
         }
+
+        // Register user
+        const user = await AuthService.registerUser(data);
+        
+        res.json({
+            success: true,
+            message: 'Користувача успішно зареєстровано'
+        });
     } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({
+        res.status(400).json({
             success: false,
-            message: 'Внутрішня помилка сервера'
+            message: error.message
         });
     }
+});
+
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email та пароль обов\'язкові'
+            });
+        }
+
+        // Authenticate user
+        const user = await AuthService.authenticateUser(email, password);
+        
+        // Generate token
+        const token = AuthService.generateToken(user.id);
+
+        res.json({
+            success: true,
+            message: 'Успішний вхід',
+            token: token,
+            user: {
+                id: user.id,
+                login: user.login,
+                name: user.name,
+                email: user.email
+            }
+        });
+    } catch (error) {
+        res.status(401).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+app.get('/profile', authenticateToken, (req, res) => {
+    try {
+        const user = AuthService.getUserById(req.user.userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Користувача не знайдено'
+            });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                login: user.login,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                birthdate: user.birthdate,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Помилка сервера'
+        });
+    }
+});
+
+app.post('/verify-token', authenticateToken, (req, res) => {
+    res.json({
+        success: true,
+        message: 'Токен дійсний',
+        user: req.user
+    });
 });
 
 // Start server

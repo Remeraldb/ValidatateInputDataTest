@@ -19,7 +19,6 @@ class Validator {
     }
     
     static validatePhone(phone) {
-        // Remove spaces and validate Ukrainian phone format
         const cleanPhone = phone.replace(/\s+/g, '');
         const phoneRegex = /^(\+?38)?(0\d{9})$/;
         return phoneRegex.test(cleanPhone);

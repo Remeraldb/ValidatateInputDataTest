@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "id": "1763907682782",
+      "login": "Jameson",
+      "name": "James Gunn",
+      "email": "jamesgunn@gmail.com",
+      "password": "$2a$10$gpxqbpwcQODZau3DKM1EDO.eHh9Xoehug/klxDSBYxuIjKRasqkUm",
+      "phone": "+380 999 888 777",
+      "birthdate": "2025-11-01",
+      "createdAt": "2025-11-23T14:21:22.782Z"
+    }
+  ]
+}

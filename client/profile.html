@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профіль користувача</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Error Popup -->
+    <div id="errorPopup" class="popup">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3>Помилка</h3>
+                <span class="close-btn" id="closePopup">&times;</span>
+            </div>
+            <div class="popup-body">
+                <div class="error-icon">⚠️</div>
+                <p id="popupMessage"></p>
+            </div>
+            <div class="popup-footer">
+                <button id="confirmError" class="btn-primary">Зрозуміло</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Профіль користувача</h1>
+        
+        <div id="userProfile" class="profile-container">
+            <div class="loading">Завантаження...</div>
+        </div>
+
+        <div class="profile-actions">
+            <button id="verifyToken" class="btn-primary">Перевірити токен</button>
+            <button id="logout" class="btn-secondary">Вийти</button>
+        </div>
+
+        <div class="links">
+            <p><a href="index.html">Реєстрація</a> | <a href="login.html">Вхід</a></p>
+        </div>
+
+        <div id="tokenStatus" class="token-status" style="display: none;">
+            <h3>Статус токена</h3>
+            <div id="tokenData"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
