@@ -92,7 +92,15 @@ class TokenManager {
     }
 
     static isLoggedIn() {
-        return !!this.getToken();
+        const token = this.getToken();
+        if (!token) return false;
+        
+        // Check if token is expired
+        const tokenData = this.decodeToken(token);
+        if (!tokenData || !tokenData.exp) return false;
+        
+        // Check if token is expired (exp is in seconds, Date.now() is in milliseconds)
+        return tokenData.exp * 1000 > Date.now();
     }
 
     static decodeToken(token) {
@@ -102,6 +110,20 @@ class TokenManager {
         } catch (error) {
             return null;
         }
+    }
+
+    static getTokenExpiry() {
+        const token = this.getToken();
+        if (!token) return null;
+        
+        const tokenData = this.decodeToken(token);
+        return tokenData ? tokenData.exp * 1000 : null;
+    }
+
+    static getTimeUntilExpiry() {
+        const expiry = this.getTokenExpiry();
+        if (!expiry) return 0;
+        return Math.max(0, expiry - Date.now());
     }
 }
 
@@ -128,16 +150,23 @@ if (document.getElementById('loginForm')) {
         await submitLogin();
     });
 
-    // Show token info if user is logged in
+    // Only show token info if user is actually logged in with valid token
     if (TokenManager.isLoggedIn()) {
         document.getElementById('tokenInfo').style.display = 'block';
         const tokenData = TokenManager.decodeToken(TokenManager.getToken());
+        const timeLeft = TokenManager.getTimeUntilExpiry();
+        
         document.getElementById('tokenData').innerHTML = `
             <p><strong>Токен:</strong> ${TokenManager.getToken().substring(0, 20)}...</p>
             <p><strong>User ID:</strong> ${tokenData.userId}</p>
-            <p><strong>Видано:</strong> ${new Date(tokenData.timestamp).toLocaleString()}</p>
-            <p><strong>Дійсний до:</strong> ${new Date(tokenData.timestamp + 120000).toLocaleString()}</p>
+            <p><strong>Видано:</strong> ${new Date(tokenData.iat * 1000).toLocaleString()}</p>
+            <p><strong>Дійсний до:</strong> ${new Date(tokenData.exp * 1000).toLocaleString()}</p>
+            <p><strong>Залишилось:</strong> ${Math.floor(timeLeft / 1000)} секунд</p>
         `;
+    } else {
+        // Remove expired token
+        TokenManager.removeToken();
+        document.getElementById('tokenInfo').style.display = 'none';
     }
 }
 
@@ -147,10 +176,14 @@ if (document.getElementById('userProfile')) {
     loadUserProfile();
 
     // Verify token button
-    document.getElementById('verifyToken').addEventListener('click', verifyToken);
+    if (document.getElementById('verifyToken')) {
+        document.getElementById('verifyToken').addEventListener('click', verifyToken);
+    }
 
     // Logout button
-    document.getElementById('logout').addEventListener('click', logout);
+    if (document.getElementById('logout')) {
+        document.getElementById('logout').addEventListener('click', logout);
+    }
 }
 
 // Registration functions
@@ -305,7 +338,7 @@ async function submitLogin() {
         
         if (result.success) {
             TokenManager.setToken(result.token);
-            popupManager.showSuccess(result.message);
+            popupManager.showSuccess('Успішний вхід! Перенаправлення...');
             
             // Redirect to profile after 2 seconds
             setTimeout(() => {
@@ -327,10 +360,10 @@ async function submitLogin() {
 async function loadUserProfile() {
     const token = TokenManager.getToken();
     
-    if (!token) {
+    if (!token || !TokenManager.isLoggedIn()) {
         document.getElementById('userProfile').innerHTML = `
             <div class="error-message">
-                <p>Ви не авторизовані. Будь ласка, <a href="login.html">увійдіть</a> в систему.</p>
+                <p>Ви не авторизовані або токен закінчився. Будь ласка, <a href="login.html">увійдіть</a> в систему.</p>
             </div>
         `;
         return;
@@ -352,6 +385,10 @@ async function loadUserProfile() {
                 <div class="profile-card">
                     <h3>Інформація про користувача</h3>
                     <div class="profile-field">
+                        <label>ID:</label>
+                        <span>${result.user.id}</span>
+                    </div>
+                    <div class="profile-field">
                         <label>Логін:</label>
                         <span>${result.user.login}</span>
                     </div>
@@ -365,11 +402,11 @@ async function loadUserProfile() {
                     </div>
                     <div class="profile-field">
                         <label>Телефон:</label>
-                        <span>${result.user.phone}</span>
+                        <span>${result.user.phone || 'Не вказано'}</span>
                     </div>
                     <div class="profile-field">
                         <label>Дата народження:</label>
-                        <span>${new Date(result.user.birthdate).toLocaleDateString()}</span>
+                        <span>${result.user.birthdate ? new Date(result.user.birthdate).toLocaleDateString() : 'Не вказано'}</span>
                     </div>
                     <div class="profile-field">
                         <label>Дата реєстрації:</label>
@@ -380,17 +417,25 @@ async function loadUserProfile() {
         } else {
             popupManager.showError(result.message);
             TokenManager.removeToken();
+            // Reload to show login prompt
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
         }
     } catch (error) {
-        popupManager.showError('Помилка завантаження профілю');
+        document.getElementById('userProfile').innerHTML = `
+            <div class="error-message">
+                <p>Помилка завантаження профілю. Спробуйте оновити сторінку.</p>
+            </div>
+        `;
     }
 }
 
 async function verifyToken() {
     const token = TokenManager.getToken();
     
-    if (!token) {
-        popupManager.showError('Токен не знайдено');
+    if (!token || !TokenManager.isLoggedIn()) {
+        popupManager.showError('Токен не знайдено або закінчився');
         return;
     }
 
@@ -408,15 +453,18 @@ async function verifyToken() {
         if (result.success) {
             document.getElementById('tokenStatus').style.display = 'block';
             const tokenData = TokenManager.decodeToken(token);
+            const timeLeft = TokenManager.getTimeUntilExpiry();
+            
             document.getElementById('tokenData').innerHTML = `
-                <p><strong>Статус:</strong> Дійсний</p>
+                <p><strong>Статус:</strong> <span style="color: green;">Дійсний</span></p>
                 <p><strong>User ID:</strong> ${result.user.userId}</p>
-                <p><strong>Видано:</strong> ${new Date(tokenData.timestamp).toLocaleString()}</p>
-                <p><strong>Дійсний до:</strong> ${new Date(tokenData.timestamp + 120000).toLocaleString()}</p>
-                <p><strong>Залишилось:</strong> ${Math.max(0, Math.floor((tokenData.timestamp + 120000 - Date.now()) / 1000))} секунд</p>
+                <p><strong>Видано:</strong> ${new Date(tokenData.iat * 1000).toLocaleString()}</p>
+                <p><strong>Дійсний до:</strong> ${new Date(tokenData.exp * 1000).toLocaleString()}</p>
+                <p><strong>Залишилось:</strong> ${Math.floor(timeLeft / 1000)} секунд</p>
             `;
         } else {
             popupManager.showError(result.message);
+            TokenManager.removeToken();
         }
     } catch (error) {
         popupManager.showError('Помилка перевірки токена');
@@ -475,3 +523,13 @@ if (document.getElementById('phone')) {
         e.target.value = value;
     });
 }
+
+// Auto-check token expiry every 30 seconds
+setInterval(() => {
+    if (TokenManager.isLoggedIn()) {
+        const timeLeft = TokenManager.getTimeUntilExpiry();
+        if (timeLeft < 30000) { // 30 seconds left
+            console.log('Token expiring soon:', Math.floor(timeLeft / 1000) + 's left');
+        }
+    }
+}, 30000);
